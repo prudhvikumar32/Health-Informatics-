@@ -109,6 +109,7 @@ export interface JobPostingData {
 
 export interface StateJobCount {
   state: string;
+  stateCode?: string;
   jobCount: number;
   percentage: number;
 }

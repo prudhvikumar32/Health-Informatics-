@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
-// Auth
+// Public Pages
+import LandingPage from "@/pages/landing-page";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
 
@@ -23,11 +24,12 @@ import SkillGapAnalysis from "@/pages/hr/skill-gap-analysis";
 function Router() {
   return (
     <Switch>
-      {/* Auth Routes */}
+      {/* Public Routes */}
+      <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
       
       {/* Job Seeker Routes */}
-      <ProtectedRoute path="/" component={JobSeekerDashboard} roles={["job_seeker", "hr"]} />
+      <ProtectedRoute path="/dashboard" component={JobSeekerDashboard} roles={["job_seeker", "hr"]} />
       <ProtectedRoute path="/roles" component={RoleExplorer} roles={["job_seeker", "hr"]} />
       <ProtectedRoute path="/skills" component={SkillInsights} roles={["job_seeker", "hr"]} />
       <ProtectedRoute path="/salary" component={SalaryExplorer} roles={["job_seeker", "hr"]} />

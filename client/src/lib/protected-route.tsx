@@ -37,7 +37,7 @@ export function ProtectedRoute({
     return (
       <Route path={path}>
         {user.role === "job_seeker" ? (
-          <Redirect to="/" />
+          <Redirect to="/dashboard" />
         ) : (
           <Redirect to="/hr/dashboard" />
         )}

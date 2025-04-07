@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Force a page reload to properly redirect
       setTimeout(() => {
-        window.location.href = data.user.role === 'hr' ? '/hr/dashboard' : '/';
+        window.location.href = data.user.role === 'hr' ? '/hr/dashboard' : '/dashboard';
       }, 500);
     },
     onError: (error: Error) => {
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Force a page reload to properly redirect
       setTimeout(() => {
-        window.location.href = data.user.role === 'hr' ? '/hr/dashboard' : '/';
+        window.location.href = data.user.role === 'hr' ? '/hr/dashboard' : '/dashboard';
       }, 500);
     },
     onError: (error: Error) => {

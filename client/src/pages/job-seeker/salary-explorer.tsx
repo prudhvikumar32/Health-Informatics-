@@ -1,24 +1,48 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import Header from '@/components/layout/header';
-import Sidebar from '@/components/layout/sidebar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { useToast } from '@/hooks/use-toast';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Line, Area } from 'recharts';
-import { Loader2, Download, BookmarkPlus } from 'lucide-react';
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import Header from "@/components/layout/header";
+import Sidebar from "@/components/layout/sidebar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { useToast } from "@/hooks/use-toast";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ComposedChart,
+  Line,
+  Area,
+} from "recharts";
+import { Loader2, Download, BookmarkPlus } from "lucide-react";
 
 const SalaryExplorer: React.FC = () => {
   const { toast } = useToast();
-  const [selectedJobRole, setSelectedJobRole] = useState<string>('all');
-  const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const [selectedJobRole, setSelectedJobRole] = useState<string>("all");
+  const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [salaryRange, setSalaryRange] = useState<number[]>([60000, 150000]);
-  const [experienceLevel, setExperienceLevel] = useState<string>('all');
-  
+  const [experienceLevel, setExperienceLevel] = useState<string>("all");
+
   const { data: jobRoles, isLoading: jobRolesLoading } = useQuery({
-    queryKey: ['/api/jobs'],
+    queryKey: ["/api/jobs"],
   });
 
   const handleSaveInsight = () => {
@@ -27,7 +51,7 @@ const SalaryExplorer: React.FC = () => {
       description: "Salary comparison has been saved to your profile",
     });
   };
-  
+
   const handleExportData = () => {
     toast({
       title: "Data Exported",
@@ -36,10 +60,10 @@ const SalaryExplorer: React.FC = () => {
   };
 
   const experienceLevelData = [
-    { level: 'Entry Level (0-2 yrs)', salary: 65000 },
-    { level: 'Mid Level (3-5 yrs)', salary: 85000 },
-    { level: 'Senior (6-9 yrs)', salary: 110000 },
-    { level: 'Expert (10+ yrs)', salary: 135000 }
+    { level: "Entry Level (0-2 yrs)", salary: 65000 },
+    { level: "Mid Level (3-5 yrs)", salary: 85000 },
+    { level: "Senior (6-9 yrs)", salary: 110000 },
+    { level: "Expert (10+ yrs)", salary: 135000 },
   ];
 
   const salaryTrendData = [
@@ -48,9 +72,9 @@ const SalaryExplorer: React.FC = () => {
     { year: 2020, salary: 79000 },
     { year: 2021, salary: 82500 },
     { year: 2022, salary: 87250 },
-    { year: 2023, salary: 92000 }
+    { year: 2023, salary: 92000 },
   ];
-  
+
   const formatSalary = (value: number) => `$${value.toLocaleString()}`;
 
   if (jobRolesLoading) {
@@ -79,15 +103,28 @@ const SalaryExplorer: React.FC = () => {
                 {/* Page Heading */}
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-semibold text-gray-900">Salary Explorer</h1>
-                    <p className="mt-1 text-sm text-gray-600">Compare salaries across different health informatics roles, locations, and experience levels.</p>
+                    <h1 className="text-2xl font-semibold text-gray-900">
+                      Salary Explorer
+                    </h1>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Compare salaries across different health informatics
+                      roles, locations, and experience levels.
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" className="flex items-center gap-2" onClick={handleSaveInsight}>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      onClick={handleSaveInsight}
+                    >
                       <BookmarkPlus className="h-4 w-4" />
                       Save Report
                     </Button>
-                    <Button variant="outline" className="flex items-center gap-2" onClick={handleExportData}>
+                    <Button
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      onClick={handleExportData}
+                    >
                       <Download className="h-4 w-4" />
                       Export Data
                     </Button>
@@ -99,57 +136,93 @@ const SalaryExplorer: React.FC = () => {
                   <CardHeader>
                     <CardTitle>Salary Filters</CardTitle>
                     <CardDescription>
-                      Customize your salary exploration by role, region, experience, and salary range
+                      Customize your salary exploration by role, region,
+                      experience, and salary range
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Job Role</label>
-                        <Select value={selectedJobRole} onValueChange={setSelectedJobRole}>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">
+                          Job Role
+                        </label>
+                        <Select
+                          value={selectedJobRole}
+                          onValueChange={setSelectedJobRole}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select a job role" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All Health Informatics Roles</SelectItem>
-                            {jobRoles?.map(role => (
-                              <SelectItem key={role.id} value={role.id.toString()}>{role.title}</SelectItem>
+                            <SelectItem value="all">
+                              All Health Informatics Roles
+                            </SelectItem>
+                            {jobRoles?.map((role) => (
+                              <SelectItem
+                                key={role.id}
+                                value={role.id.toString()}
+                              >
+                                {role.title}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Region</label>
-                        <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">
+                          Region
+                        </label>
+                        <Select
+                          value={selectedRegion}
+                          onValueChange={setSelectedRegion}
+                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Select a region" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">National Average</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Experience Level</label>
-                        <Select value={experienceLevel} onValueChange={setExperienceLevel}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select experience level" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Experience Levels</SelectItem>
-                            <SelectItem value="entry">Entry Level (0-2 yrs)</SelectItem>
-                            <SelectItem value="mid">Mid Level (3-5 yrs)</SelectItem>
-                            <SelectItem value="senior">Senior (6-9 yrs)</SelectItem>
-                            <SelectItem value="expert">Expert (10+ yrs)</SelectItem>
+                            <SelectItem value="all">
+                              National Average
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div>
                         <label className="text-sm font-medium text-gray-700 block mb-1">
-                          Salary Range: ${salaryRange[0].toLocaleString()} - ${salaryRange[1].toLocaleString()}
+                          Experience Level
+                        </label>
+                        <Select
+                          value={experienceLevel}
+                          onValueChange={setExperienceLevel}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select experience level" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">
+                              All Experience Levels
+                            </SelectItem>
+                            <SelectItem value="entry">
+                              Entry Level (0-2 yrs)
+                            </SelectItem>
+                            <SelectItem value="mid">
+                              Mid Level (3-5 yrs)
+                            </SelectItem>
+                            <SelectItem value="senior">
+                              Senior (6-9 yrs)
+                            </SelectItem>
+                            <SelectItem value="expert">
+                              Expert (10+ yrs)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 block mb-1">
+                          Salary Range: ${salaryRange[0].toLocaleString()} - $
+                          {salaryRange[1].toLocaleString()}
                         </label>
                         <Slider
                           min={40000}
@@ -165,9 +238,9 @@ const SalaryExplorer: React.FC = () => {
                       <Button
                         variant="secondary"
                         onClick={() => {
-                          setSelectedJobRole('all');
-                          setSelectedRegion('all');
-                          setExperienceLevel('all');
+                          setSelectedJobRole("all");
+                          setSelectedRegion("all");
+                          setExperienceLevel("all");
                           setSalaryRange([60000, 150000]);
                         }}
                       >
@@ -195,9 +268,18 @@ const SalaryExplorer: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="level" />
                           <YAxis tickFormatter={formatSalary} />
-                          <Tooltip formatter={(value) => [`$${(value as number).toLocaleString()}`, 'Average Salary']} />
+                          <Tooltip
+                            formatter={(value) => [
+                              `$${(value as number).toLocaleString()}`,
+                              "Average Salary",
+                            ]}
+                          />
                           <Legend />
-                          <Bar dataKey="salary" name="Average Salary" fill="#10b981" />
+                          <Bar
+                            dataKey="salary"
+                            name="Average Salary"
+                            fill="#10b981"
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -209,7 +291,8 @@ const SalaryExplorer: React.FC = () => {
                   <CardHeader>
                     <CardTitle>Salary Trends (2018-2023)</CardTitle>
                     <CardDescription>
-                      Historical salary trends for health informatics professionals
+                      Historical salary trends for health informatics
+                      professionals
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -222,10 +305,27 @@ const SalaryExplorer: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="year" />
                           <YAxis tickFormatter={formatSalary} />
-                          <Tooltip formatter={(value) => [`$${(value as number).toLocaleString()}`, 'Average Salary']} />
+                          <Tooltip
+                            formatter={(value) => [
+                              `$${(value as number).toLocaleString()}`,
+                              "Average Salary",
+                            ]}
+                          />
                           <Legend />
-                          <Area type="monotone" dataKey="salary" fill="#e0f2fe" stroke="#3b82f6" name="Average Salary" />
-                          <Line type="monotone" dataKey="salary" stroke="#3b82f6" strokeWidth={2} activeDot={{ r: 8 }} />
+                          <Area
+                            type="monotone"
+                            dataKey="salary"
+                            fill="#e0f2fe"
+                            stroke="#3b82f6"
+                            name="Average Salary"
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="salary"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            activeDot={{ r: 8 }}
+                          />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
@@ -243,27 +343,35 @@ const SalaryExplorer: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="bg-blue-50 rounded-lg p-4">
-                        <h3 className="text-sm font-medium text-blue-800">Geographic Impact</h3>
+                        <h3 className="text-sm font-medium text-blue-800">
+                          Geographic Impact
+                        </h3>
                         <p className="mt-2 text-sm text-blue-700">
-                          The West and Northeast regions consistently offer higher salaries for health informatics roles.
+                          The West and Northeast regions consistently offer
+                          higher salaries for health informatics roles.
                         </p>
                       </div>
                       <div className="bg-green-50 rounded-lg p-4">
-                        <h3 className="text-sm font-medium text-green-800">Experience Premium</h3>
+                        <h3 className="text-sm font-medium text-green-800">
+                          Experience Premium
+                        </h3>
                         <p className="mt-2 text-sm text-green-700">
-                          Senior professionals earn significantly more than entry-level candidates.
+                          Senior professionals earn significantly more than
+                          entry-level candidates.
                         </p>
                       </div>
                       <div className="bg-purple-50 rounded-lg p-4">
-                        <h3 className="text-sm font-medium text-purple-800">Growth Trajectory</h3>
+                        <h3 className="text-sm font-medium text-purple-800">
+                          Growth Trajectory
+                        </h3>
                         <p className="mt-2 text-sm text-purple-700">
-                          The field has seen consistent annual growth in compensation.
+                          The field has seen consistent annual growth in
+                          compensation.
                         </p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-
               </div>
             </div>
           </div>
