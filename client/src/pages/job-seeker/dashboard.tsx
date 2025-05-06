@@ -4,11 +4,14 @@ import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import CardMetric from "@/components/ui/card-metric";
 import SalaryChart from "@/components/charts/salary-chart";
-import SkillsChart from "@/components/charts/skills-chart";
+import TopSkillsSection from "@/components/job-seeker/TopSkillsSection";
 import JobDistributionMap from "@/components/charts/job-distribution-map";
 import TopSkillsChart from "@/components/charts/top-skills-chart";
 import RegionalSalaryChart from "@/components/charts/regional-salary-chart";
 import JobSearch from "@/components/job-seeker/job-search";
+import { useCSVData } from "../job-seeker/useCSVData";
+import { useMemo } from "react";
+
 import {
   MetricCardData,
   TopRoleData,
@@ -37,12 +40,29 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const JobSeekerDashboard: React.FC = () => {
+  const { data: csvData, loading: csvLoading } = useCSVData();
+  useEffect(() => {
+    if (!csvLoading && csvData.length > 0) {
+      console.log("✅ CSV Data loaded:", csvData.slice(0, 5));
+    }
+  }, [csvData, csvLoading]);
+
+
+  const top5SalaryJobs = useMemo(() => {
+    if (!csvData || csvData.length === 0) return [];
+    return [...csvData]
+      .filter((job) => job["Average Salary ($)"]) // ensure valid salary
+      .sort((a, b) => Number(b["Average Salary ($)"]) - Number(a["Average Salary ($)"]))
+      .slice(0, 5);
+  }, [csvData]);
+
   const { toast } = useToast();
   const [selectedSpecialty, setSelectedSpecialty] =
     useState<string>("all_specialties");
   const [selectedJobType, setSelectedJobType] =
     useState<string>("all_job_types");
   const [selectedJobs, setSelectedJobs] = useState<SelectedJobData[]>([]);
+  const [selectedEmploymentType, setSelectedEmploymentType] = useState("all");
 
   // Fetch job roles
   const { data: jobRoles, isLoading: jobRolesLoading } = useQuery({
@@ -54,94 +74,315 @@ const JobSeekerDashboard: React.FC = () => {
     queryKey: ["/api/skills"],
   });
 
-  // Metrics data
-  const metricsData: MetricCardData[] = [
-    {
-      title: "Total Health IT Jobs",
-      value: "15,734",
-      change: "12% from last month",
-      trend: "up",
-      icon: "fas fa-briefcase",
-      iconBgColor: "bg-blue-100",
-      iconColor: "text-primary",
-    },
-    {
-      title: "Average Salary",
-      value: "$87,250",
-      change: "3.5% year over year",
-      trend: "up",
-      icon: "fas fa-dollar-sign",
-      iconBgColor: "bg-green-100",
-      iconColor: "text-green-600",
-    },
-    {
-      title: "Field Growth Rate",
-      value: "14%",
-      change: "Faster than average",
-      trend: "up",
-      icon: "fas fa-chart-line",
-      iconBgColor: "bg-blue-100",
-      iconColor: "text-blue-600",
-    },
-    {
-      title: "Job Outlook (10yr)",
-      value: "Very Positive",
-      change: "High demand projected",
-      trend: "up",
-      icon: "fas fa-binoculars",
-      iconBgColor: "bg-purple-100",
-      iconColor: "text-purple-600",
-    },
-  ];
+  const filteredData = useMemo(() => {
+    if (!csvData || csvData.length === 0) return [];
 
-  // Top roles data
-  const topRolesData: TopRoleData[] = [
-    {
-      title: "Chief Medical Information Officer",
-      salary: 145000,
-      width: "100%",
-    },
-    { title: "Clinical Informatics Director", salary: 125000, width: "90%" },
-    { title: "Health Data Scientist", salary: 115000, width: "85%" },
-    { title: "Health IT Project Manager", salary: 98000, width: "75%" },
-    { title: "Clinical Systems Analyst", salary: 85000, width: "65%" },
-  ];
+    return csvData.filter((job) => {
+      const title = job["Job Title"]?.toLowerCase() || "";
+      const remote = job["Remote Work"]?.toLowerCase() === "yes";
+      const employmentType = job["Employment Type"]?.toLowerCase() || "";
+
+      const matchesSpecialty =
+        selectedSpecialty === "all_specialties" ||
+        (selectedSpecialty === "Data & Analytics" && (
+          title.includes("data") ||
+          title.includes("analytics") ||
+          title.includes("scientist") ||
+          title.includes("engineer")
+        )) ||
+        (selectedSpecialty === "Clinical Informatics" && (
+          title.includes("clinical") ||
+          title.includes("ehr") ||
+          title.includes("medical") ||
+          title.includes("applications")
+        )) ||
+        (selectedSpecialty === "Health IT Management" && (
+          title.includes("manager") ||
+          title.includes("project") ||
+          title.includes("consultant")
+        )) ||
+        (selectedSpecialty === "Public & Population Health" && (
+          title.includes("population") ||
+          title.includes("public")
+        )) ||
+        (selectedSpecialty === "Coding & Terminology" && (
+          title.includes("coder") ||
+          title.includes("terminology")
+        )) ||
+        (selectedSpecialty === "Telehealth & Remote Care" && (
+          title.includes("telehealth")
+        ));
+
+      const matchesJobType =
+        selectedJobType === "all_job_types" ||
+        (selectedJobType === "remote" && remote) ||
+        (selectedJobType === "on_site" && !remote);
+
+      const matchesEmploymentType =
+        selectedEmploymentType === "all" ||
+        employmentType === selectedEmploymentType;
+
+      return matchesSpecialty && matchesJobType && matchesEmploymentType;
+    });
+  }, [csvData, selectedSpecialty, selectedJobType, selectedEmploymentType]);
+
+  // Metrics data
+  const metricsData: MetricCardData[] = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+
+    const totalJobs = filteredData.length;
+
+    const salaries = filteredData
+      .map((job) => Number(job["Average Salary ($)"]))
+      .filter((val) => !isNaN(val));
+
+    const avgSalary = salaries.reduce((a, b) => a + b, 0) / salaries.length;
+
+    const growthRates = filteredData
+      .map((job) => Number(job["Job Growth (%)"]))
+      .filter((val) => !isNaN(val));
+
+    const avgGrowthRate =
+      growthRates.reduce((a, b) => a + b, 0) / growthRates.length;
+
+    return [
+      {
+        title: "Total Health IT Jobs",
+        value: totalJobs.toLocaleString(),
+        change: "Based on current listings",
+        trend: "up",
+        icon: "fas fa-briefcase",
+        iconBgColor: "bg-blue-100",
+        iconColor: "text-primary",
+      },
+      {
+        title: "Average Salary",
+        value: `$${Math.round(avgSalary).toLocaleString()}`,
+        change: "",
+        trend: "up",
+        icon: "fas fa-dollar-sign",
+        iconBgColor: "bg-green-100",
+        iconColor: "text-green-600",
+      },
+      {
+        title: "Field Growth Rate",
+        value: `${avgGrowthRate.toFixed(1)}%`,
+        change: "Average of job growth column",
+        trend: "up",
+        icon: "fas fa-chart-line",
+        iconBgColor: "bg-blue-100",
+        iconColor: "text-blue-600",
+      },
+      {
+        title: "Job Outlook (10yr)",
+        value: "Very Positive",
+        change: "",
+        trend: "up",
+        icon: "fas fa-binoculars",
+        iconBgColor: "bg-purple-100",
+        iconColor: "text-purple-600",
+      },
+    ];
+  }, [filteredData]);
+  const topRolesData = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+
+    const roleMap: Record<string, number[]> = {};
+
+    filteredData.forEach((job) => {
+      const title = job["Job Title"];
+      const salary = Number(job["Average Salary ($)"]);
+      if (!title || isNaN(salary)) return;
+
+      if (!roleMap[title]) roleMap[title] = [];
+      roleMap[title].push(salary);
+    });
+
+    const averaged = Object.entries(roleMap).map(([title, salaries]) => ({
+      title,
+      salary: Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length),
+    }));
+
+    const sorted = averaged.sort((a, b) => b.salary - a.salary).slice(0, 5);
+    const topSalary = sorted[0]?.salary || 1;
+
+    return sorted.map((role) => ({
+      ...role,
+      width: `${Math.round((role.salary / topSalary) * 100)}%`,
+    }));
+  }, [filteredData]);
 
   // Skills data
-  const skillsData: SkillData[] = [
-    { name: "EHR Systems", percentage: 92, category: "Technical Skills" },
-    { name: "SQL/Databases", percentage: 85, category: "Technical Skills" },
-    { name: "Data Analysis", percentage: 78, category: "Technical Skills" },
-    { name: "HL7/FHIR", percentage: 65, category: "Technical Skills" },
-    { name: "Communication", percentage: 88, category: "Soft Skills" },
-    { name: "Problem Solving", percentage: 82, category: "Soft Skills" },
-    { name: "Teamwork", percentage: 76, category: "Soft Skills" },
-    { name: "Project Management", percentage: 70, category: "Soft Skills" },
-  ];
+  const skillsData: SkillData[] = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
 
+    const skillCounts: Record<string, number> = {};
+
+    // Step 1: Count each individual skill
+    filteredData.forEach((job) => {
+      const skills = job["Key Skills"];
+      if (!skills) return;
+
+      skills.split(",").forEach((rawSkill) => {
+        const skill = rawSkill.trim();
+        if (!skill) return;
+
+        skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+      });
+    });
+
+    // Step 2: Define categories (BI included in Data Analysis)
+    const groupedSkills: Record<string, { label: string; total: number }> = {
+      data: { label: "Data Analysis & Visualization", total: 0 },
+      interoperability: { label: "Interoperability", total: 0 },
+      ai: { label: "AI/ML in Healthcare", total: 0 },
+      infra: { label: "Cloud & Integration", total: 0 },
+      coding: { label: "Programming & Automation", total: 0 },
+      training: { label: "Training", total: 0 },
+
+      communication: { label: "Communication & Teamwork", total: 0 },
+      project: { label: "Project Management", total: 0 },
+      change: { label: "Change Management", total: 0 },
+    };
+
+    // Step 3: Group skills into categories
+    for (const [skill, count] of Object.entries(skillCounts)) {
+      const lower = skill.toLowerCase();
+
+      if (
+        lower.includes("power bi") ||
+        lower.includes("tableau") ||
+        lower.includes("data") ||
+        lower.includes("visual")
+      ) {
+        groupedSkills.data.total += count;
+      } else if (lower.includes("fhir") || lower.includes("hl7") || lower.includes("ehr")) {
+        groupedSkills.interoperability.total += count;
+      } else if (lower.includes("ai") || lower.includes("ml")) {
+        groupedSkills.ai.total += count;
+      } else if (lower.includes("cloud") || lower.includes("integration")) {
+        groupedSkills.infra.total += count;
+      } else if (lower.includes("python")) {
+        groupedSkills.coding.total += count;
+      } else if (lower.includes("train")) {
+        groupedSkills.training.total += count;
+      } else if (lower.includes("communication") || lower.includes("team")) {
+        groupedSkills.communication.total += count;
+      } else if (lower.includes("project")) {
+        groupedSkills.project.total += count;
+      } else if (lower.includes("change")) {
+        groupedSkills.change.total += count;
+      }
+    }
+
+    // Step 4: Separate and normalize
+    const techSkills: SkillData[] = [];
+    const softSkills: SkillData[] = [];
+
+    let techTotal = 0;
+    let softTotal = 0;
+
+    for (const [key, group] of Object.entries(groupedSkills)) {
+      if (group.total === 0) continue;
+
+      const isSoft = ["communication", "project", "change"].includes(key);
+      if (isSoft) softTotal += group.total;
+      else techTotal += group.total;
+    }
+
+    for (const [key, group] of Object.entries(groupedSkills)) {
+      if (group.total === 0) continue;
+
+      const isSoft = ["communication", "project", "change"].includes(key);
+      const percentage = isSoft
+        ? Math.round((group.total / softTotal) * 100)
+        : Math.round((group.total / techTotal) * 100);
+
+      const data = {
+        name: group.label,
+        percentage,
+        category: isSoft ? "Soft Skills" : "Technical Skills",
+      };
+
+      if (isSoft) softSkills.push(data);
+      else techSkills.push(data);
+    }
+
+    // Fix rounding issue for each group separately
+    const fixPercentages = (arr: SkillData[]) => {
+      const sum = arr.reduce((a, b) => a + b.percentage, 0);
+      const diff = 100 - sum;
+      if (diff !== 0 && arr.length > 0) {
+        arr[0].percentage += diff;
+      }
+    };
+
+    fixPercentages(techSkills);
+    fixPercentages(softSkills);
+
+    return [...techSkills.sort((a, b) => b.percentage - a.percentage), ...softSkills.sort((a, b) => b.percentage - a.percentage)];
+  }, [filteredData]);
+
+  const stateToCodeMap: Record<string, string> = {
+    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+    "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+    "Florida": "FL", "Georgia": "GA", "Hawaii": "HI", "Idaho": "ID",
+    "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+    "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+    "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+    "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV",
+    "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+    "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+    "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI", "South Carolina": "SC",
+    "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX", "Utah": "UT",
+    "Vermont": "VT", "Virginia": "VA", "Washington": "WA", "West Virginia": "WV",
+    "Wisconsin": "WI", "Wyoming": "WY", "District of Columbia": "DC"
+  };
   // Location data
-  const locationData: StateJobCount[] = [
-    { state: "California", jobCount: 2145, percentage: 15 },
-    { state: "Texas", jobCount: 1876, percentage: 12 },
-    { state: "New York", jobCount: 1652, percentage: 10 },
-    { state: "Florida", jobCount: 1435, percentage: 9 },
-    { state: "Massachusetts", jobCount: 1287, percentage: 8 },
-    { state: "Illinois", jobCount: 1158, percentage: 7 },
-    { state: "Pennsylvania", jobCount: 1042, percentage: 6 },
-    { state: "Ohio", jobCount: 985, percentage: 6 },
-    { state: "Michigan", jobCount: 876, percentage: 5 },
-    { state: "North Carolina", jobCount: 792, percentage: 5 },
-  ];
+  const locationData: StateJobCount[] = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
 
-  // Regional salary data
-  const regionalSalaryData: RegionalSalaryData[] = [
-    { region: "West", salary: 103750, jobCount: 3874 },
-    { region: "Northeast", salary: 98500, jobCount: 3256 },
-    { region: "Midwest", salary: 89250, jobCount: 3548 },
-    { region: "Southeast", salary: 85000, jobCount: 2765 },
-    { region: "Southwest", salary: 82500, jobCount: 2291 },
-  ];
+    const counts: Record<string, number> = {};
 
+    filteredData.forEach((job) => {
+      if (!job.State) return;
+      counts[job.State] = (counts[job.State] || 0) + 1;
+    });
+
+    const total = Object.values(counts).reduce((sum, val) => sum + val, 0);
+
+    return Object.entries(counts).map(([state, jobCount]) => ({
+      state,
+      stateCode: stateToCodeMap[state] || "", // add this map below
+      jobCount,
+      percentage: jobCount / total,
+    }));
+  }, [filteredData]);
+
+
+  const regionalSalaryData: RegionalSalaryData[] = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+    const regionGroups: Record<string, number[]> = {};
+
+    filteredData.forEach((job) => {
+      const region = job.Region;
+      const salary = Number(job["Average Salary ($)"]);
+
+      if (!region || isNaN(salary)) return;
+
+      if (!regionGroups[region]) {
+        regionGroups[region] = [];
+      }
+
+      regionGroups[region].push(salary);
+    });
+
+    return Object.entries(regionGroups).map(([region, salaries]) => ({
+      region,
+      salary: Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length),
+      jobCount: salaries.length,
+    }));
+  }, [filteredData]);
   // Job posting data
   const jobPostingsData: JobPostingData[] = [
     {
@@ -249,6 +490,8 @@ const JobSeekerDashboard: React.FC = () => {
       return skillsData;
     }
 
+
+
     // In a real application, you would fetch the skills specific to the selected jobs
     // For now, we'll simulate this by returning a subset of skills with adjusted percentages
     const selectedTitles = selectedJobs.map((job) => job.title.toLowerCase());
@@ -307,6 +550,24 @@ const JobSeekerDashboard: React.FC = () => {
     });
   };
 
+  const topSkills = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+
+    const skillCounts: Record<string, number> = {};
+
+    filteredData.forEach((row) => {
+      const skill = row["Key Skills"]?.trim();
+      if (!skill) return;
+
+      skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+    });
+
+    return Object.entries(skillCounts)
+      .map(([skill, count]) => ({ skill, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3); // Top 3
+  }, [filteredData]);
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -344,29 +605,39 @@ const JobSeekerDashboard: React.FC = () => {
                         <label className="text-sm font-medium text-gray-700 block mb-1">
                           Specialty Area
                         </label>
-                        <Select
-                          value={selectedSpecialty}
-                          onValueChange={setSelectedSpecialty}
-                        >
+                        <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
                           <SelectTrigger className="w-full md:w-[250px]">
                             <SelectValue placeholder="Select a specialty" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all_specialties">
-                              All Specialty Areas
-                            </SelectItem>
-                            <SelectItem value="analytical">
-                              Data & Analytics
-                            </SelectItem>
-                            <SelectItem value="clinical">
-                              Clinical Informatics
-                            </SelectItem>
-                            <SelectItem value="technical">
-                              Technical Implementation
-                            </SelectItem>
+                            <SelectItem value="all_specialties">All Specialties</SelectItem>
+                            <SelectItem value="Data & Analytics">Data & Analytics</SelectItem>
+                            <SelectItem value="Clinical Informatics">Clinical Informatics</SelectItem>
+                            <SelectItem value="Health IT Management">Health IT Management</SelectItem>
+                            <SelectItem value="Public & Population Health">Public & Population Health</SelectItem>
+                            <SelectItem value="Coding & Terminology">Coding & Terminology</SelectItem>
+                            <SelectItem value="Telehealth & Remote Care">Telehealth & Remote Care</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="flex-grow">
+                        <label className="text-sm font-medium text-gray-700 block mb-1">
+                          Employment Type
+                        </label>
+                        <Select value={selectedEmploymentType} onValueChange={setSelectedEmploymentType}>
+                          <SelectTrigger className="w-full md:w-[250px]">
+                            <SelectValue placeholder="Select employment type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            <SelectItem value="full-time">Full-Time</SelectItem>
+                            <SelectItem value="part-time">Part-Time</SelectItem>
+                            <SelectItem value="contract">Contract</SelectItem>
+                            <SelectItem value="temporary">Temporary</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
 
                       <div className="flex-grow">
                         <label className="text-sm font-medium text-gray-700 block mb-1">
@@ -405,12 +676,26 @@ const JobSeekerDashboard: React.FC = () => {
                   </CardContent>
                 </Card>
 
+                {/* {!csvLoading && top5SalaryJobs.length > 0 && (
+                  <div className="bg-white border rounded-md shadow p-4 mb-6">
+                    <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                      Top 5 Highest Paying Jobs (From CSV)
+                    </h2>
+                    <ul className="list-disc pl-6 text-gray-700 text-sm">
+                      {top5SalaryJobs.map((job, index) => (
+                        <li key={index}>
+                          <strong>{job["Job Title"]}</strong> — ${Number(job["Average Salary ($)"]).toLocaleString()}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )} */}
                 {/* Main content - tabs for different views */}
                 <Tabs defaultValue="overview" className="space-y-6">
-                  <TabsList className="grid grid-cols-3 w-full md:w-auto">
+                  <TabsList className="grid grid-cols-2 w-full md:w-auto">
                     <TabsTrigger value="overview">Market Overview</TabsTrigger>
                     <TabsTrigger value="jobs">Job Search</TabsTrigger>
-                    <TabsTrigger value="skills">Skills Analysis</TabsTrigger>
+                    {/* <TabsTrigger value="skills">Skills Analysis</TabsTrigger> */}
                   </TabsList>
 
                   {/* Overview Tab */}
@@ -424,10 +709,18 @@ const JobSeekerDashboard: React.FC = () => {
                       />
 
                       {/* In-Demand Skills */}
-                      <SkillsChart
-                        skills={skillsData}
-                        title="Top In-Demand Skills"
-                      />
+                      <Card>
+  <CardHeader>
+    <CardTitle>Top In-Demand Skills</CardTitle>
+    <CardDescription>
+      Breakdown of current top technical and soft skills
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <TopSkillsSection skills={skillsData} />
+  </CardContent>
+</Card>
+
                     </div>
 
                     {/* Geographic Job Distribution Map */}
@@ -551,49 +844,22 @@ const JobSeekerDashboard: React.FC = () => {
                               <h4 className="text-sm font-medium text-gray-700">
                                 Fastest Growing Skills
                               </h4>
-                              <div className="space-y-3">
-                                <div className="flex items-center">
-                                  <div className="w-32 text-sm">
-                                    AI/ML in Healthcare
+                              <div>
+                                <h2 className="text-xl font-bold mb-4">Fastest Growing Skills</h2>
+                                {topSkills.map((s) => (
+                                  <div key={s.skill} className="mb-2">
+                                    <div className="flex justify-between font-medium">
+                                      <span>{s.skill}</span>
+                                      <span className="text-green-600">{s.count} jobs</span>
+                                    </div>
+                                    <div className="h-2 bg-gray-200 rounded">
+                                      <div
+                                        className="h-full bg-green-500 rounded"
+                                        style={{ width: `${Math.min(s.count * 10, 100)}%` }}
+                                      ></div>
+                                    </div>
                                   </div>
-                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-green-500 rounded-full"
-                                      style={{ width: "85%" }}
-                                    ></div>
-                                  </div>
-                                  <div className="w-16 text-right text-sm font-medium text-green-600">
-                                    +35%
-                                  </div>
-                                </div>
-                                <div className="flex items-center">
-                                  <div className="w-32 text-sm">
-                                    FHIR Standards
-                                  </div>
-                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-green-500 rounded-full"
-                                      style={{ width: "70%" }}
-                                    ></div>
-                                  </div>
-                                  <div className="w-16 text-right text-sm font-medium text-green-600">
-                                    +28%
-                                  </div>
-                                </div>
-                                <div className="flex items-center">
-                                  <div className="w-32 text-sm">
-                                    Cloud Healthcare
-                                  </div>
-                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-green-500 rounded-full"
-                                      style={{ width: "60%" }}
-                                    ></div>
-                                  </div>
-                                  <div className="w-16 text-right text-sm font-medium text-green-600">
-                                    +24%
-                                  </div>
-                                </div>
+                                ))}
                               </div>
                             </div>
 

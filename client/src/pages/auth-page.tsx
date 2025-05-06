@@ -275,7 +275,7 @@ const AuthPage: React.FC = () => {
                                 <div className="text-xs text-gray-500">Looking for career insights</div>
                               </div>
                               <div 
-                                className={`border rounded-md p-3 flex-1 cursor-pointer ${field.value === 'hr' ? 'border-primary bg-blue-50' : 'border-gray-200'}`}
+                                className={`border hidden rounded-md p-3 flex-1 cursor-pointer ${field.value === 'hr' ? 'border-primary bg-blue-50' : 'border-gray-200'}`}
                                 onClick={() => registerForm.setValue('role', 'hr')}
                               >
                                 <div className="font-medium">HR Professional</div>
@@ -312,7 +312,7 @@ const AuthPage: React.FC = () => {
           </Tabs>
           
           {/* Demo Quick Access */}
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-gray-200 hidden">
             <p className="text-center text-sm text-gray-600 mb-2">Quick access (Demo)</p>
             <div className="flex justify-center space-x-4">
               <Button 

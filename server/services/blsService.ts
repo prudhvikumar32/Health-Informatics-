@@ -3,7 +3,7 @@ import { BLSOccupation, BLSSalaryData, BLSLocationData, BLSGrowthData } from '@s
 
 // BLS API configuration
 const BLS_API_KEY = process.env.BLS_API_KEY || 'register_api_key';
-const BLS_BASE_URL = 'https://api.bls.gov/publicAPI/v2';
+const BLS_BASE_URL = 'https://api.bls.gx`ov/publicAPI/v2';
 
 // Fetch job data from BLS API
 export async function getBLSJobData(): Promise<BLSOccupation[]> {

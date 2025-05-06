@@ -74,8 +74,7 @@ const JobDistributionMap: React.FC<JobDistributionMapProps> = ({ data, title }) 
   const [hoveredState, setHoveredState] = useState<string | null>(null);
   
   // Use CSV data with calculated percentages
-  const displayData = calculatePercentages(csvData);
-  
+  const displayData = calculatePercentages(data);  
   // Create a mapping of state codes to job data
   const stateJobMap: Record<string, { jobCount: number, percentage: number }> = {};
   

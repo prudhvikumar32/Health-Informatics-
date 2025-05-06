@@ -1,132 +1,269 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+// RoleExplorerWithCharts.tsx
+import React, { useState, useMemo } from 'react';
 import Header from '@/components/layout/header';
 import Sidebar from '@/components/layout/sidebar';
-import { JobRole, JobPostingData, SelectedJobData } from '@shared/types';
 import {
   Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
+  CardContent
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, BookmarkPlus, ExternalLink, TrendingUp } from 'lucide-react';
-import JobSearch from '@/components/job-seeker/job-search';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell } from 'recharts';
+import { useCSVData } from '../job-seeker/useCSVData';
 
-const RoleExplorer: React.FC = () => {
-  const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState<number | null>(null);
-  const [selectedJobs, setSelectedJobs] = useState<SelectedJobData[]>([]);
+const COLORS = ['#3b82f6', '#10b981'];
 
-  const { data: jobRoles, isLoading: jobRolesLoading } = useQuery<JobRole[]>({
-    queryKey: ['/api/jobs'],
-  });
+const RoleExplorerWithCharts: React.FC = () => {
+  const { data: csvData, loading: csvLoading } = useCSVData();
+  const [selectedSpecialty, setSelectedSpecialty] = useState("all_specialties");
+  const [selectedRegion, setSelectedRegion] = useState('all');
+  const [selectedEmployment, setSelectedEmployment] = useState('all');
 
-  const { data: roleDetails, isLoading: roleDetailsLoading } = useQuery({
-    queryKey: ['/api/jobs', selectedRole],
-    enabled: selectedRole !== null,
-  });
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+  const specialtyKeywords: Record<string, string[]> = {
+    "Data & Analytics": ["data", "analytics", "scientist", "engineer"],
+    "Clinical Informatics": ["clinical", "ehr", "medical", "applications"],
+    "Health IT Management": ["manager", "project", "consultant"],
+    "Public & Population Health": ["population", "public"],
+    "Coding & Terminology": ["coder", "terminology"],
+    "Telehealth & Remote Care": ["telehealth"]
   };
 
-  const filteredRoles = jobRoles?.filter(role =>
-    role.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    role.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredData = useMemo(() => {
+    if (!csvData || csvData.length === 0) return [];
+    return csvData.filter((job) => {
+      const title = job['Job Title']?.toLowerCase();
+      const region = job['Region'];
+      const employment = job['Employment Type'];
+      const matchesSpecialty = selectedSpecialty === "all_specialties" ||
+        (specialtyKeywords[selectedSpecialty] || []).some((kw) => title?.includes(kw));
 
-  const handleSaveRole = (roleId: number) => {
-    toast({
-      title: 'Role Saved',
-      description: 'This role has been added to your saved items',
+      return (
+        matchesSpecialty &&
+        (selectedRegion === 'all' || region === selectedRegion) &&
+        (selectedEmployment === 'all' || employment === selectedEmployment)
+      );
     });
-  };
+  }, [csvData, selectedSpecialty, selectedRegion, selectedEmployment]);
 
-  const mockJobPostings: JobPostingData[] = [
-    {
-      id: 1,
-      title: 'Healthcare IT Project Manager',
-      company: 'Cleveland Clinic',
-      location: 'Cleveland, OH',
-      salary: '$95,000 - $110,000',
-      postedAt: '5 days ago',
-      remote: false,
-    },
-    {
-      id: 2,
-      title: 'Senior Health Informatics Specialist',
-      company: 'Mayo Clinic',
-      location: 'Rochester, MN',
-      salary: '$105,000 - $125,000',
-      postedAt: '1 week ago',
-      remote: true,
-    },
-    {
-      id: 3,
-      title: 'Healthcare Data Architect',
-      company: 'Cerner Corporation',
-      location: 'Kansas City, MO',
-      salary: '$120,000 - $140,000',
-      postedAt: '3 days ago',
-      remote: false,
-    },
-  ];
+  const avgSalaryByJob = useMemo(() => {
+    const grouped: Record<string, number[]> = {};
+    filteredData.forEach((job) => {
+      const title = job['Job Title'];
+      const salary = parseFloat(String(job['Average Salary ($)']));
+      if (!title || isNaN(salary)) return;
+      if (!grouped[title]) grouped[title] = [];
+      grouped[title].push(salary);
+    });
+    return Object.entries(grouped).map(([title, salaries]) => ({
+      title,
+      avgSalary: Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length)
+    })).sort((a, b) => b.avgSalary - a.avgSalary);
+  }, [filteredData]);
 
-  const handleJobSelectionChange = (jobs: SelectedJobData[]) => {
-    setSelectedJobs(jobs);
-  };
+  const jobCountByTitle = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filteredData.forEach((job) => {
+      const title = job['Job Title'];
+      if (!title) return;
+      counts[title] = (counts[title] || 0) + 1;
+    });
+    return Object.entries(counts).map(([title, count]) => ({ title, count })).sort((a, b) => b.count - a.count);
+  }, [filteredData]);
+
+  const remotePieData = useMemo(() => {
+    let remote = 0;
+    let onsite = 0;
+    filteredData.forEach((job) => {
+      const remoteFlag = String(job['Remote Work']).toLowerCase();
+      if (remoteFlag === 'yes') remote++;
+      else onsite++;
+    });
+    return [
+      { name: 'Remote', value: remote },
+      { name: 'On-site', value: onsite }
+    ];
+  }, [filteredData]);
+
+  const salaryTrendByYear = useMemo(() => {
+    const grouped: Record<string, Record<number, number[]>> = {};
+    filteredData.forEach((job) => {
+      const title = job['Job Title'];
+      const year = parseInt(String(job['Year']));
+      const salary = parseFloat(String(job['Average Salary ($)']));
+      if (!title || !year || isNaN(salary)) return;
+      if (!grouped[title]) grouped[title] = {};
+      if (!grouped[title][year]) grouped[title][year] = [];
+      grouped[title][year].push(salary);
+    });
+
+    const chartData: Record<number, Record<string, number>> = {};
+    Object.entries(grouped).forEach(([title, yearMap]) => {
+      Object.entries(yearMap).forEach(([yearStr, salaries]) => {
+        const year = parseInt(yearStr);
+        const avg = Math.round(salaries.reduce((a, b) => a + b, 0) / salaries.length);
+        if (!chartData[year]) chartData[year] = { year };
+        chartData[year][title] = avg;
+      });
+    });
+    return Object.values(chartData).sort((a, b) => a.year - b.year);
+  }, [filteredData]);
+
+  const uniqueRegions = [...new Set(csvData?.map((j) => j['Region']).filter(Boolean))];
+  const uniqueEmploymentTypes = [...new Set(csvData?.map((j) => j['Employment Type']).filter(Boolean))];
 
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
       <div className="flex-1 flex">
         <Sidebar />
-        <div className="flex-1 overflow-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              <div className="flex flex-col space-y-8">
-                <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">Health Informatics Role Explorer</h1>
-                  <p className="mt-1 text-sm text-gray-600">Discover detailed information about various health informatics careers and their requirements.</p>
+        <div className="flex-1 overflow-auto p-6">
+          <div className="max-w-7xl mx-auto space-y-8">
+            <h1 className="text-2xl font-semibold">Role Explorer Dashboard</h1>
+            <Card>
+              <CardHeader>
+                <CardTitle>Filters</CardTitle>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-3 gap-4">
+                <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Specialty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_specialties">All Specialties</SelectItem>
+                    {Object.keys(specialtyKeywords).map((spec) => (
+                      <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {uniqueRegions.map((r) => (
+                      <SelectItem key={r} value={r}>{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedEmployment} onValueChange={setSelectedEmployment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Employment Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    {uniqueEmploymentTypes.map((e) => (
+                      <SelectItem key={e} value={e}>{e}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Average Salary by Job Title</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={avgSalaryByJob.slice(0, 10)}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="title" tick={{ fontSize: 10 }} />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="avgSalary" fill="#3b82f6" name="Avg Salary" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
+              </CardContent>
+            </Card>
 
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="relative flex-grow">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                        <Input
-                          type="text"
-                          placeholder="Search roles by title or keyword"
-                          className="pl-8"
-                          value={searchTerm}
-                          onChange={handleSearchChange}
+            <Card>
+              <CardHeader>
+                <CardTitle>Job Count by Title</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={jobCountByTitle.slice(0, 10)}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="title" tick={{ fontSize: 10 }} />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" fill="#10b981" name="Job Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Remote vs On-Site Jobs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={remotePieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label
+                      >
+                        {remotePieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Salary Trends Over Years</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={salaryTrendByYear}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      {Object.keys(salaryTrendByYear[0] || {}).filter(k => k !== 'year').map((title) => (
+                        <Line
+                          key={title}
+                          type="monotone"
+                          dataKey={title}
+                          stroke="#3b82f6"
+                          dot={false}
                         />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="whitespace-nowrap">Filter Options</Button>
-                        <Button variant="outline" className="whitespace-nowrap" onClick={() => setSearchTerm('')}>Clear Filters</Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <JobSearch
-                  jobListings={mockJobPostings}
-                  onJobSelectionChange={handleJobSelectionChange}
-                />
-
-                {/* The rest of the tabs and detail rendering would go here */}
-              </div>
-            </div>
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -134,4 +271,4 @@ const RoleExplorer: React.FC = () => {
   );
 };
 
-export default RoleExplorer;
+export default RoleExplorerWithCharts;

@@ -15,6 +15,7 @@ import SkillInsights from "@/pages/job-seeker/skill-insights";
 import SalaryExplorer from "@/pages/job-seeker/salary-explorer";
 import LocationInsights from "@/pages/job-seeker/location-insights";
 
+
 // HR Pages
 import HRDashboard from "@/pages/hr/dashboard";
 import MarketTrends from "@/pages/hr/market-trends";

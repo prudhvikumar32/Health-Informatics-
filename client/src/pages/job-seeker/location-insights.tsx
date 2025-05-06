@@ -10,7 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { SalaryByLocation } from '@shared/schema';
 import { Loader2, Download, BookmarkPlus, Share2 } from 'lucide-react';
-
+import { useCSVData } from "../job-seeker/useCSVData";
+import { useMemo,useEffect} from "react";
 // State abbreviations for display purposes
 const stateAbbreviations: Record<string, string> = {
   'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
@@ -41,11 +42,52 @@ const LocationInsights: React.FC = () => {
   const { toast } = useToast();
   const [selectedJobRole, setSelectedJobRole] = useState<string>('all');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
-  
+  const [selectedSpecialty, setSelectedSpecialty] = useState("all_specialties");
+  const specialtyKeywords: Record<string, string[]> = {
+    "Data & Analytics": ["data", "analytics", "scientist", "engineer"],
+    "Clinical Informatics": ["clinical", "ehr", "medical", "applications"],
+    "Health IT Management": ["manager", "project", "consultant"],
+    "Public & Population Health": ["population", "public"],
+    "Coding & Terminology": ["coder", "terminology"],
+    "Telehealth & Remote Care": ["telehealth"]
+  };
+
+  const matchesSpecialty = (job: Record<string, any>) =>
+    selectedSpecialty === "all_specialties" ||
+    (specialtyKeywords[selectedSpecialty] || []).some((keyword) =>
+      job["Job Title"]?.toLowerCase().includes(keyword)
+    );
+
+
+   const { data: csvData, loading: csvLoading } = useCSVData();
+    useEffect(() => {
+      if (!csvLoading && csvData.length > 0) {
+        console.log("✅ Loaded CSV data:", csvData.slice(0, 5));
+      }
+    }, [csvData, csvLoading]);
   // Fetch job roles
   const { data: jobRoles, isLoading: jobRolesLoading } = useQuery({
     queryKey: ['/api/jobs'],
   });
+
+  const filteredData = useMemo(() => {
+    if (!csvData || csvData.length === 0) return [];
+  
+    return csvData.filter((job) => {
+      const title = job["Job Title"]?.toLowerCase() || "";
+  
+      const matchesSpecialty =
+        selectedSpecialty === "all_specialties" ||
+        (specialtyKeywords[selectedSpecialty] || []).some((kw) =>
+          title.includes(kw)
+        );
+  
+        const matchesRegion =
+      selectedRegion === "all" ||
+      (regions[selectedRegion]?.includes(job.State))
+      return matchesSpecialty && matchesRegion;
+    });
+  }, [csvData, selectedSpecialty,selectedRegion]);
   
   // Fetch location data for selected job role
   const { data: locationData, isLoading: locationDataLoading } = useQuery<SalaryByLocation[]>({
@@ -80,79 +122,127 @@ const LocationInsights: React.FC = () => {
   };
   
   // Filter location data based on selected filters
-  const getFilteredLocationData = () => {
-    if (!locationData) return [];
-    
-    return locationData.filter(item => {
-      // Filter by region if selected
-      if (selectedRegion !== 'all') {
-        const regionStates = regions[selectedRegion];
-        if (!regionStates.includes(item.state)) {
-          return false;
-        }
-      }
-      
-      return true;
+  const filteredLocationData = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+  
+    return filteredData.filter((job) => {
+      const matchesJob =
+        selectedJobRole === 'all' ||
+        job['Job Title']?.toLowerCase().includes(selectedJobRole.toLowerCase());
+  
+      const matchesRegion =
+        selectedRegion === 'all' || regions[selectedRegion]?.includes(job.State);
+  
+      return matchesJob && matchesRegion;
     });
-  };
+  }, [csvData, selectedJobRole, selectedRegion]);
   
-  const filteredLocationData = getFilteredLocationData();
   
-  // Prepare data for job distribution chart
-  const prepareJobDistributionData = () => {
-    const stateData: Record<string, number> = {
-      'California': 2145,
-      'Texas': 1876,
-      'New York': 1652,
-      'Florida': 1435,
-      'Massachusetts': 1287,
-      'Illinois': 1158,
-      'Pennsylvania': 1042,
-      'Ohio': 985,
-      'Michigan': 876,
-      'North Carolina': 792,
-    };
-    
-    return Object.entries(stateData)
+  const jobDistributionData = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+  
+    const grouped = filteredData.reduce((acc, row) => {
+      const state = row.State?.trim();
+      if (!state) return acc;
+      acc[state] = (acc[state] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  
+    const totalJobs = Object.values(grouped).reduce((a, b) => a + b, 0);
+  
+    return Object.entries(grouped)
       .map(([state, jobCount]) => ({
         state,
-        stateCode: stateAbbreviations[state],
+        stateCode: stateAbbreviations[state] || state.slice(0, 2).toUpperCase(),
         jobCount,
-        percentage: Math.round((jobCount / 15734) * 100)
+        percentage: Math.round((jobCount / totalJobs) * 100),
       }))
       .sort((a, b) => b.jobCount - a.jobCount);
-  };
+  }, [filteredData]);
   
-  const jobDistributionData = prepareJobDistributionData();
   
   // Prepare data for regional distribution pie chart
-  const prepareRegionalDistributionData = () => {
-    const regionData: Record<string, number> = {
-      'West': 4500,
-      'Northeast': 4200,
-      'Southeast': 3000,
-      'Midwest': 2500,
-      'Southwest': 1534
-    };
-    
-    return Object.entries(regionData)
+  const regionalDistributionData = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+  
+    const grouped = filteredData.reduce((acc, row) => {
+      const region = row.Region?.trim();
+      if (!region) return acc;
+      acc[region] = (acc[region] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  
+    const totalJobs = Object.values(grouped).reduce((a, b) => a + b, 0);
+  
+    return Object.entries(grouped)
       .map(([region, jobCount]) => ({
         region,
         jobCount,
-        percentage: Math.round((jobCount / 15734) * 100)
+        percentage: Math.round((jobCount / totalJobs) * 100),
       }))
       .sort((a, b) => b.jobCount - a.jobCount);
-  };
+  }, [filteredData]);
   
-  const regionalDistributionData = prepareRegionalDistributionData();
+  const workArrangementData = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
   
-  // Prepare remote vs. on-site data
-  const workArrangementData = [
-    { name: 'Remote', value: 35 },
-    { name: 'Hybrid', value: 45 },
-    { name: 'On-site', value: 20 }
-  ];
+    let remote = 0;
+    let onsite = 0;
   
+    filteredData.forEach((job) => {
+      const value = job["Remote Work"]?.toLowerCase();
+      if (value === "yes") remote += 1;
+      else onsite += 1;
+    });
+  
+    const total = remote + onsite;
+  
+    return [
+      { name: "Remote", value: Math.round((remote / total) * 100) },
+      { name: "On-site", value: Math.round((onsite / total) * 100) },
+    ];
+  }, [filteredData]);
+
+  const topCities = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+  
+    const counts: Record<string, number> = {};
+    filteredData.forEach((job) => {
+      const city = job["City"]?.trim();
+      const state = job["State"]?.trim();
+      if (!city || !state) return;
+      const key = `${city}, ${state}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+  
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6); // top 6 cities
+  }, [filteredData]);
+
+  const remoteTrends = useMemo(() => {
+    if (!filteredData || filteredData.length === 0) return [];
+  
+    const grouped: Record<string, { total: number; remote: number }> = {};
+  
+    filteredData.forEach((job) => {
+      const year = String(job["Year"])?.trim();
+      const remote = job["Remote Work"]?.toLowerCase() === "yes";
+      if (!year) return;
+      if (!grouped[year]) grouped[year] = { total: 0, remote: 0 };
+      grouped[year].total += 1;
+      if (remote) grouped[year].remote += 1;
+    });
+  
+    return Object.entries(grouped)
+      .map(([year, { total, remote }]) => ({
+        year,
+        percentage: Math.round((remote / total) * 100),
+      }))
+      .sort((a, b) => parseInt(a.year) - parseInt(b.year));
+  }, [csvData]);
+
   // Loading indicator
   if (jobRolesLoading) {
     return (
@@ -222,22 +312,20 @@ const LocationInsights: React.FC = () => {
                         <label className="text-sm font-medium text-gray-700 block mb-1">
                           Job Role
                         </label>
-                        <Select
-                          value={selectedJobRole}
-                          onValueChange={setSelectedJobRole}
-                        >
-                          <SelectTrigger className="w-full md:w-[250px]">
-                            <SelectValue placeholder="Select a job role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Health Informatics Roles</SelectItem>
-                            {jobRoles?.map(role => (
-                              <SelectItem key={role.id} value={role.id.toString()}>
-                                {role.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+  <SelectTrigger className="w-full md:w-[250px]">
+    <SelectValue placeholder="Select a specialty" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all_specialties">All Specialties</SelectItem>
+    <SelectItem value="Data & Analytics">Data & Analytics</SelectItem>
+    <SelectItem value="Clinical Informatics">Clinical Informatics</SelectItem>
+    <SelectItem value="Health IT Management">Health IT Management</SelectItem>
+    <SelectItem value="Public & Population Health">Public & Population Health</SelectItem>
+    <SelectItem value="Coding & Terminology">Coding & Terminology</SelectItem>
+    <SelectItem value="Telehealth & Remote Care">Telehealth & Remote Care</SelectItem>
+  </SelectContent>
+</Select>
                       </div>
                       
                       <div className="flex-grow">
@@ -292,16 +380,16 @@ const LocationInsights: React.FC = () => {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="stateCode" />
                           <YAxis />
-                          <Tooltip 
-                            formatter={(value, name) => [value, name === 'jobCount' ? 'Job Count' : 'Percentage']}
-                            labelFormatter={(label, payload) => {
-                              if (payload && payload.length > 0) {
-                                const data = payload[0].payload;
-                                return `State: ${data.state}`;
-                              }
-                              return label;
-                            }}
-                          />
+                          <Tooltip
+  formatter={(value) => [`${value.toLocaleString()} jobs`, 'Job Count']}
+  labelFormatter={(label, payload) => {
+    if (payload?.[0]?.payload) {
+      return `State: ${payload[0].payload.state}`;
+    }
+    return label;
+  }}
+/>
+
                           <Legend />
                           <Bar dataKey="jobCount" name="Job Count" fill="#3b82f6" />
                         </BarChart>
@@ -402,50 +490,17 @@ const LocationInsights: React.FC = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-                            <span>Boston, MA</span>
-                          </div>
-                          <div className="text-sm font-medium">785 jobs</div>
+                    <div className="space-y-4">
+                    {topCities.map((city, index) => (
+                      <div key={city.name} className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full bg-blue-600"></div>
+                          <span>{city.name}</span>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-                            <span>San Francisco, CA</span>
-                          </div>
-                          <div className="text-sm font-medium">723 jobs</div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-                            <span>New York, NY</span>
-                          </div>
-                          <div className="text-sm font-medium">687 jobs</div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-                            <span>Seattle, WA</span>
-                          </div>
-                          <div className="text-sm font-medium">542 jobs</div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-                            <span>Chicago, IL</span>
-                          </div>
-                          <div className="text-sm font-medium">498 jobs</div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-3 rounded-full bg-blue-600"></div>
-                            <span>Austin, TX</span>
-                          </div>
-                          <div className="text-sm font-medium">462 jobs</div>
-                        </div>
+                        <div className="text-sm font-medium">{city.count.toLocaleString()} jobs</div>
                       </div>
+                    ))}
+                  </div>
                     </CardContent>
                   </Card>
                   
@@ -458,51 +513,20 @@ const LocationInsights: React.FC = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-6">
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium">2020</span>
-                            <span className="text-sm text-gray-500">15% Remote</span>
-                          </div>
-                          <div className="bg-gray-200 rounded-full">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: '15%' }}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium">2021</span>
-                            <span className="text-sm text-gray-500">32% Remote</span>
-                          </div>
-                          <div className="bg-gray-200 rounded-full">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: '32%' }}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium">2022</span>
-                            <span className="text-sm text-gray-500">48% Remote</span>
-                          </div>
-                          <div className="bg-gray-200 rounded-full">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: '48%' }}></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-medium">2023</span>
-                            <span className="text-sm text-gray-500">58% Remote</span>
-                          </div>
-                          <div className="bg-gray-200 rounded-full">
-                            <div className="bg-blue-600 h-2 rounded-full" style={{ width: '58%' }}></div>
-                          </div>
-                        </div>
-                        
-                        <div className="bg-blue-50 p-4 rounded-md mt-4">
-                          <h3 className="text-sm font-medium text-blue-800">Key Insight</h3>
-                          <p className="mt-1 text-sm text-blue-700">
-                            Remote work opportunities in health informatics have nearly quadrupled since 2020, with over half of current positions offering remote or hybrid arrangements.
-                          </p>
-                        </div>
-                      </div>
+                    {remoteTrends.map((item) => (
+  <div key={item.year}>
+    <div className="flex justify-between items-center mb-1">
+      <span className="text-sm font-medium">{item.year}</span>
+      <span className="text-sm text-gray-500">{item.percentage}% Remote</span>
+    </div>
+    <div className="bg-gray-200 rounded-full">
+      <div
+        className="bg-blue-600 h-2 rounded-full"
+        style={{ width: `${item.percentage}%` }}
+      ></div>
+    </div>
+  </div>
+))}
                     </CardContent>
                   </Card>
                 </div>
